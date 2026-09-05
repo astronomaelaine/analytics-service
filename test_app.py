@@ -28,15 +28,14 @@ Executar com:
     pytest test_app.py -v
 """
 
+import importlib
+import json
 import os
 import sys
-import json
-import importlib
 from unittest.mock import MagicMock, patch
 
 import pytest
 from botocore.exceptions import ClientError
-
 
 # --- Variáveis de ambiente exigidas pelo app.py na importação ---
 os.environ.setdefault("AWS_REGION", "us-east-1")
@@ -68,9 +67,10 @@ def app_module():
     mock_session = MagicMock()
     mock_session.client.side_effect = fake_client
 
-    with patch("boto3.Session", return_value=mock_session), \
-         patch("threading.Thread") as mock_thread_cls:
-
+    with (
+        patch("boto3.Session", return_value=mock_session),
+        patch("threading.Thread") as mock_thread_cls,
+    ):
         mock_thread_instance = MagicMock()
         mock_thread_cls.return_value = mock_thread_instance
 
@@ -109,6 +109,7 @@ def make_sqs_message(body_dict, message_id="msg-1", receipt_handle="receipt-1"):
 # /health
 # ----------------------------------------------------------------------
 
+
 def test_health_check(client):
     response = client.get("/health")
     assert response.status_code == 200
@@ -118,6 +119,7 @@ def test_health_check(client):
 # ----------------------------------------------------------------------
 # Inicialização do módulo (clientes Boto3 e thread do worker)
 # ----------------------------------------------------------------------
+
 
 def test_clientes_boto3_sao_mocks_e_nao_conexoes_reais(app_module):
     assert app_module.sqs_client is app_module._mock_sqs_client
@@ -144,6 +146,7 @@ def test_worker_thread_e_criada_como_daemon_mas_nunca_roda_de_verdade(app_module
 # ----------------------------------------------------------------------
 # process_message
 # ----------------------------------------------------------------------
+
 
 def test_process_message_sucesso(app_module):
     mock_dynamo = app_module._mock_dynamodb_client
@@ -234,6 +237,7 @@ def test_process_message_campo_obrigatorio_ausente_nao_deleta_da_fila(app_module
 # sqs_worker_loop
 # ----------------------------------------------------------------------
 
+
 def test_sqs_worker_loop_processa_lote_de_mensagens(app_module):
     mock_sqs = app_module._mock_sqs_client
     mock_dynamo = app_module._mock_dynamodb_client
@@ -278,13 +282,17 @@ def test_sqs_worker_loop_sem_mensagens_apenas_continua(app_module):
     mock_dynamo.put_item.assert_not_called()
 
 
-def test_sqs_worker_loop_client_error_no_receive_aguarda_e_continua(app_module, monkeypatch):
+def test_sqs_worker_loop_client_error_no_receive_aguarda_e_continua(
+    app_module, monkeypatch
+):
     mock_sqs = app_module._mock_sqs_client
     mock_sleep = MagicMock()
     monkeypatch.setattr(app_module.time, "sleep", mock_sleep)
 
     mock_sqs.receive_message.side_effect = [
-        ClientError({"Error": {"Code": "Throttling", "Message": "x"}}, "ReceiveMessage"),
+        ClientError(
+            {"Error": {"Code": "Throttling", "Message": "x"}}, "ReceiveMessage"
+        ),
         SystemExit,
     ]
 
