@@ -29,3 +29,4 @@ jobs:
       ecr-repository: ${{ vars.ECR_REPOSITORY }}
       image-name: "analytics-service"
       app-version: ${{ vars.APP_VERSION }}
+      
