@@ -5,7 +5,7 @@ on:
   pull_request:
   push:
     branches:
-      - TC_fase03
+      - main
 
 permissions:
   contents: read
@@ -30,3 +30,55 @@ jobs:
       image-name: "analytics-service"
       app-version: ${{ vars.APP_VERSION }}
       
+  gitops-update:
+    name: Update GitOps Image
+
+    needs:
+      - ci
+
+    if: >
+      github.event_name == 'push' &&
+      github.ref == 'refs/heads/main'
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout GitOps repository
+        uses: actions/checkout@v6
+        with:
+          repository: ramondata/toggle-master-gitops
+          ref: master
+          ssh-key: ${{ secrets.GITOPS_DEPLOY_KEY }}
+          path: gitops
+
+      - name: Update analytics-service image tag
+        env:
+          IMAGE_TAG: ${{ needs.ci.outputs.image-tag }}
+        run: |
+          cd gitops
+
+          sed -i -E \
+            "s|^  tag:.*|  tag: ${IMAGE_TAG}|" \
+            apps/analytics-service/values.yaml
+
+          echo "New image tag:"
+          grep -A2 "^image:" apps/analytics-service/values.yaml
+
+      - name: Commit GitOps change
+        env:
+          IMAGE_TAG: ${{ needs.ci.outputs.image-tag }}
+        run: |
+          cd gitops
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add apps/analytics-service/values.yaml
+
+          if git diff --cached --quiet; then
+            echo "No GitOps changes detected"
+            exit 0
+          fi
+
+          git commit -m "chore(analytics-service): deploy ${IMAGE_TAG}"
+          git push origin master

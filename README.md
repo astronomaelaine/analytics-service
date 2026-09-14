@@ -37,6 +37,75 @@ aws dynamodb create-table \
 ```
 (Nota: O throughput provisionado acima é o mínimo possível, ideal para o free tier/testes).
 
+## 📂 Estrutura do projeto
+
+- `app.py`: aplicação com autenticação e CRUD
+- `Dockerfile`: imagem de container do serviço
+- `k8s/`: manifests Kubernetes para deploy e configuração
+- `.github/workflows/ci-analytics.yaml`: pipeline CI/CD do serviço
+- `test_app.py`: testes automatizados da API
+
+## <img src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/docker.png" width="25" height="25" /> Execução com Docker Compose
+
+O arquivo [docker-compose.yaml](docker-compose.yaml) já configura:
+
+- contêiner do `analytics-service`
+- rede compartilhada com outros microserviços
+
+Para subir o ambiente:
+
+```bash
+docker compose up --build
+```
+
+O serviço ficará acessível em:
+
+- http://localhost:8005
+
+## <img src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/kubernetes.png" width="25" height="25" /> Kubernetes e deploy
+
+A pasta [k8s](k8s) contém os manifests do deploy em cluster Kubernetes, incluindo:
+
+- `analytics-deploy.yaml`: deployment com 2 réplicas
+- `analytics-configmap.yaml`: ConfigMap com variáveis do serviço
+- `analytics-svc.yaml`: serviço do app
+- `kustomization.yaml`: orquestração dos manifests
+
+Observações importantes:
+
+- O deployment do `analytics-service` expõe a porta `8005`
+- Há probes de liveness e readiness em `/health`
+- O namespace utilizado é `toggle-master`
+
+## <img src="https://raw.githubusercontent.com/marwin1991/profile-technology-icons/refs/heads/main/icons/githubactions.png" width="25" height="25" /> Pipeline CI/CD
+
+O workflow em [.github/workflows/ci-analytics.yaml](.github/workflows/ci-analytics.yaml) define a pipeline do serviço.
+
+### Fluxo atual
+
+1. Disparo manual ou em eventos de `pull_request` e `push` na branch `main`
+2. Execução do workflow reutilizável de CI do repositório `astronomaelaine/CI-reusable-source-py`
+3. Build da imagem do serviço
+4. Publicação da imagem no registro ECR configurado por variáveis do ambiente
+5. Geração de tag de imagem com o valor de `APP_VERSION`
+6. Atualização automática do repositório GitOps para o serviço `analytics-service`
+
+## <img src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/argo-cd.png" width="25" height="25" /> Atualização do GitOps
+
+No job `gitops-update`, a ação:
+
+- clona o repositório `ramondata/toggle-master-gitops`
+- altera o valor do campo `tag` em `apps/analytics-service/values.yaml`
+- realiza commit com mensagem do tipo:
+
+```bash
+chore(flag-service): deploy <image-tag>
+```
+
+- envia a alteração para a branch `master`
+
+Esse processo permite que o deploy do serviço seja automatizado após aprovação do pipeline.
+
 ## 🚀 Rodando Localmente
 **1. Clone o repositório** e entre na pasta `analytics-service`.
 
