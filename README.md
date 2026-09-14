@@ -99,7 +99,7 @@ No job `gitops-update`, a ação:
 - realiza commit com mensagem do tipo:
 
 ```bash
-chore(flag-service): deploy <image-tag>
+chore(analytics-service): deploy <image-tag>
 ```
 
 - envia a alteração para a branch `master`
